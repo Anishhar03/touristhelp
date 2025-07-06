@@ -1,21 +1,21 @@
-from flask import Flask, render_template,request
+from flask import Flask, render_template, request
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import pickle
 import numpy as np
+import os  # ✅ Needed for reading the PORT environment variable
 
 # app
 app = Flask(__name__)
 
 # Load datasets and models
 features = ['Name_x', 'State', 'Type', 'BestTimeToVisit', 'Preferences', 'Gender', 'NumberOfAdults', 'NumberOfChildren']
-model = pickle.load(open('code and dataset/model.pkl','rb'))
-label_encoders = pickle.load(open('code and dataset/label_encoders.pkl','rb'))
+model = pickle.load(open('code and dataset/model.pkl', 'rb'))
+label_encoders = pickle.load(open('code and dataset/label_encoders.pkl', 'rb'))
 
 destinations_df = pd.read_csv("code and dataset/Expanded_Destinations.csv")
 userhistory_df = pd.read_csv("code and dataset/Final_Updated_Expanded_UserHistory.csv")
 df = pd.read_csv("code and dataset/final_df.csv")
-
 
 # Collaborative Filtering Function
 # Create a user-item matrix based on user history
@@ -27,21 +27,8 @@ user_item_matrix.fillna(0, inplace=True)
 # Compute cosine similarity between users
 user_similarity = cosine_similarity(user_item_matrix)
 
-
 # Function to recommend destinations based on user similarity
 def collaborative_recommend(user_id, user_similarity, user_item_matrix, destinations_df):
-    """
-    Recommends destinations based on collaborative filtering.
-
-    Args:
-    - user_id: ID of the user for whom recommendations are to be made.
-    - user_similarity: Cosine similarity matrix for users.
-    - user_item_matrix: User-item interaction matrix (e.g., ratings or preferences).
-    - destinations_df: DataFrame containing destination details.
-
-    Returns:
-    - DataFrame with recommended destinations and their details.
-    """
     # Find similar users
     similar_users = user_similarity[user_id - 1]
 
@@ -79,11 +66,11 @@ def recommend_destinations(user_input, model, label_encoders, features, data):
 
     return predicted_popularity
 
-
 # Route for the Home Page
 @app.route('/')
 def index():
     return render_template('index.html')
+
 # Route for Travel Recommendation Page
 @app.route('/recommendation')
 def recommendation():
@@ -93,8 +80,8 @@ def recommendation():
 @app.route("/recommend", methods=['GET', 'POST'])
 def recommend():
     if request.method == "POST":
-        user_id = request.form['user_id']
-        user_id = int(user_id)
+        user_id = int(request.form['user_id'])
+
         # Capture form data
         user_input = {
             'Name_x': request.form['name'],
@@ -108,18 +95,15 @@ def recommend():
         }
 
         # Collaborative filtering function
-        recommended_destinations = collaborative_recommend(user_id, user_similarity,
-                                                           user_item_matrix, destinations_df)
+        recommended_destinations = collaborative_recommend(user_id, user_similarity, user_item_matrix, destinations_df)
 
-        # Prediction function for popularity (if applicable)
+        # Prediction function for popularity
         predicted_popularity = recommend_destinations(user_input, model, label_encoders, features, df)
 
-        # Render the recommendation page with recommendations
         return render_template('recommendation.html', recommended_destinations=recommended_destinations,
                                predicted_popularity=predicted_popularity)
     return render_template('recommendation.html')
 
-
+# ✅ Run the app on Render-compatible port
 if __name__ == '__main__':
-    # Run the app in debug mode
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
